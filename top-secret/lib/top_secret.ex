@@ -3,25 +3,36 @@ defmodule TopSecret do
     Code.string_to_quoted!(string)
   end
 
-  def decode_secret_message_part(ast, acc) do
-    case ast do
-      {:def, _meta, [func_arg | _rest]} ->
-        {ast, [translate_message(func_arg) | acc]}
+  def decode_secret_message_part({:def, _meta, [func_node | _rest]} = ast_node, acc) do
+    {ast_node, [function_name_part(func_node) | acc]}
+  end
 
-      {:defp, _meta, [func_arg | _rest]} ->
-        {ast, [translate_message(func_arg) | acc]}
+  def decode_secret_message_part({:defp, _meta, [func_node | _rest]} = ast_node, acc) do
+    {ast_node, [function_name_part(func_node) | acc]}
+  end
 
-      _ ->
-        {ast, acc}
-    end
+  def decode_secret_message_part(ast_node, acc) do
+    {ast_node, acc}
   end
 
   def decode_secret_message(string) do
-    # Please implement the decode_secret_message/1 function
+    {_node, message_chunks} =
+      string
+      |> to_ast()
+      |> Macro.prewalk([], &decode_secret_message_part/2)
+
+    message_chunks
+    |> Enum.reverse()
+    |> Enum.join()
   end
 
-  defp translate_message(ast_node) do
-    {name, _meta, args} = ast_node
-    message = String.slice(Atom.to_string(name), 0..(length(args) - 1))
+  defp function_name_part({:when, _meta, [func_node | _rest]}) do
+    function_name_part(func_node)
+  end
+
+  defp function_name_part({_name, _meta, nil}), do: ""
+
+  defp function_name_part({name, _meta, args}) do
+    String.slice(Atom.to_string(name), 0, length(args))
   end
 end
